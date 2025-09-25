@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.4.1-cudnn9-runtime-ubuntu22.04
+FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
 
 # Germinal GPU-enabled container
 # - Includes micromamba-managed conda env from environment.yml
@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
     git \
+    bzip2 \
     aria2 \
     ffmpeg \
     procps \
@@ -71,9 +72,12 @@ RUN set -euxo pipefail; \
   python -m pip install "torch_geometric==2.6.*" -f "${PYG_URL}"; \
   python -m pip install \
     chex dm-haiku==0.0.13 dm-tree joblib ml-collections immutabledict optax \
-    pandas matplotlib numpy biopython scipy seaborn tqdm py3dmol colabfold \
+    pandas matplotlib numpy biopython scipy seaborn tqdm py3dmol \
     iglm chai-lab==0.6.1 torchtyping==0.1.5; \
   true
+
+# Install colabfold ignoring dependency constraints (intentional)
+RUN python -m pip install --no-deps colabfold==1.5.5
 
 # Install ColabDesign (editable)
 COPY colabdesign /workspace/colabdesign
@@ -99,8 +103,10 @@ ENV PYTHONUNBUFFERED=1 \
     MPLBACKEND=Agg \
     HYDRA_FULL_ERROR=1
 
-# Always run inside the conda env
-ENTRYPOINT ["micromamba", "run", "-n", "germinal", "--no-capture-output"]
+# Add entrypoint that raises ulimit and execs in env
+COPY docker-entrypoint.sh /usr/local/bin/germinal-entrypoint.sh
+RUN chmod +x /usr/local/bin/germinal-entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/germinal-entrypoint.sh"]
 CMD ["bash"]
 
 

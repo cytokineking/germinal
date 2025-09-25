@@ -240,7 +240,19 @@ interface_shape_comp: {'value': 0.6, 'operator': '>'}
 <!-- TOC --><a name="container"></a>
 ## Container (Docker/Compose)
 
-Run Germinal without a local install using the provided Dockerfile and docker-compose.yml. This is the recommended way to get a reproducible environment, including CUDA-enabled JAX and PyTorch. The container automatically installs PyRosetta and downloads AlphaFold-Multimer parameters.
+See `container-use.md` for full Docker/Compose guidance, including GPU prerequisites, mounts, and run patterns. Quick start:
+
+```bash
+docker build -t germinal:latest .
+
+docker run --rm -it --gpus all \
+  --shm-size=16g --ipc=host \
+  --ulimit nofile=65536:65536 \
+  -v "$PWD/pdbs:/workspace/pdbs" \
+  -v "$PWD/runs:/workspace/runs" \
+  -w /workspace germinal:latest python run_germinal.py \
+  project_dir=/workspace/runs results_dir=. experiment_name=germinal_run
+```
 
 ### Prerequisites
 
@@ -252,7 +264,7 @@ Run Germinal without a local install using the provided Dockerfile and docker-co
 Verify GPU access for containers:
 
 ```bash
-docker run --rm --gpus all nvidia/cuda:12.4.1-cudnn9-runtime-ubuntu22.04 nvidia-smi
+docker run --rm --gpus all nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04 nvidia-smi
 ```
 
 ### Build the image
@@ -277,11 +289,12 @@ Ensure these directories exist locally before running (for mounting outputs and 
 mkdir -p params pdbs runs
 ```
 
-### Run with docker run
+### Run with docker run (quick starts)
 
 ```bash
 docker run --rm -it --gpus all \
   --shm-size=16g --ipc=host \
+  --ulimit nofile=65536:65536 \
   -v "$PWD/pdbs:/workspace/pdbs" \
   -v "$PWD/runs:/workspace/runs" \
   -w /workspace germinal:latest bash
@@ -325,6 +338,26 @@ docker compose run --rm germinal python run_germinal.py \
   target=pdl1 \
   experiment_name=my_experiment \
   max_trajectories=100
+```
+
+### One-liner docker run commands (no shell)
+
+Run defaults (VHH/PD-L1) without opening a shell (outputs will appear in ./runs on host):
+
+```bash
+docker run --rm -it --gpus all --ipc=host --shm-size=16g \
+  --ulimit nofile=65536:65536 \
+  -v "$PWD/pdbs:/workspace/pdbs" -v "$PWD/runs:/workspace/runs" \
+  -w /workspace germinal:latest python run_germinal.py
+```
+
+Run scFv defaults (outputs will appear in ./runs on host):
+
+```bash
+docker run --rm -it --gpus all --ipc=host --shm-size=16g \
+  --ulimit nofile=65536:65536 \
+  -v "$PWD/pdbs:/workspace/pdbs" -v "$PWD/runs:/workspace/runs" \
+  -w /workspace germinal:latest python run_germinal.py run=scfv
 ```
 
 <!-- TOC --><a name="output-format"></a>
