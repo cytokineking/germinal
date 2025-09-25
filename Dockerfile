@@ -103,8 +103,10 @@ ENV PYTHONUNBUFFERED=1 \
     MPLBACKEND=Agg \
     HYDRA_FULL_ERROR=1
 
-# Always run inside the conda env
-ENTRYPOINT ["micromamba", "run", "-n", "germinal", "--no-capture-output"]
+# Add entrypoint that raises ulimit and execs in env
+COPY docker-entrypoint.sh /usr/local/bin/germinal-entrypoint.sh
+RUN chmod +x /usr/local/bin/germinal-entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/germinal-entrypoint.sh"]
 CMD ["bash"]
 
 
