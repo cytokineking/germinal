@@ -6,23 +6,13 @@ if command -v prlimit >/dev/null 2>&1; then
   prlimit --pid $$ --nofile=65536:65536 || true
 fi
 
-# If no arguments provided, run bash
+# If no arguments provided, open a shell in the environment
 if [[ $# -eq 0 ]]; then
-  exec micromamba run -n germinal --no-capture-output bash
+  exec micromamba run -n germinal bash
 fi
 
-# Filter out any empty arguments and exec command inside the micromamba environment
-args=()
-for arg in "$@"; do
-  if [[ -n "$arg" ]]; then
-    args+=("$arg")
-  fi
-done
-
-if [[ ${#args[@]} -eq 0 ]]; then
-  exec micromamba run -n germinal --no-capture-output bash
-else
-  exec micromamba run -n germinal --no-capture-output "${args[@]}"
-fi
+# Execute provided command via bash -lc inside the environment to avoid exec parsing issues
+cmd="$*"
+exec micromamba run -n germinal bash -lc "$cmd"
 
 
