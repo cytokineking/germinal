@@ -25,6 +25,7 @@ We describe Germinal in the preprint: ["Efficient generation of epitope-targeted
    * [CLI Overrides](#cli-overrides)
    * [Target Configuration](#target-configuration)
    * [Filters Configuration](#filters-configuration)
+- [Container (Docker/Compose)](#container)
 - [Output Format](#output-format)
 - [Tips for Design](#tips-for-design)
 - [Citation](#citation)
@@ -234,6 +235,96 @@ clashes: {'value': 1, 'operator': '<'}
 cdr3_hotspot_contacts: {'value': 0, 'operator': '>'}
 percent_interface_cdr: {'value': 0.5, 'operator': '>'}
 interface_shape_comp: {'value': 0.6, 'operator': '>'}
+```
+
+<!-- TOC --><a name="container"></a>
+## Container (Docker/Compose)
+
+Run Germinal without a local install using the provided Dockerfile and docker-compose.yml. This is the recommended way to get a reproducible environment, including CUDA-enabled JAX and PyTorch. The container automatically installs PyRosetta and downloads AlphaFold-Multimer parameters.
+
+### Prerequisites
+
+- Docker 24+
+- NVIDIA GPU with recent driver (CUDA 12+ recommended)
+- NVIDIA Container Toolkit installed and configured
+  - See `https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html`
+
+Verify GPU access for containers:
+
+```bash
+docker run --rm --gpus all nvidia/cuda:12.4.1-cudnn9-runtime-ubuntu22.04 nvidia-smi
+```
+
+### Build the image
+
+```bash
+# From the repo root
+docker build -t germinal:latest .
+
+# Or with Compose (uses docker-compose.yml build args)
+docker compose build
+```
+
+### Volumes and data locations
+
+- `/workspace/params` (AlphaFold/AF3 params) are included in the image by default
+- `./pdbs` → `/workspace/pdbs` (target PDBs)
+- `./runs` → `/workspace/runs` (outputs)
+
+Ensure these directories exist locally before running (for mounting outputs and inputs you want to persist):
+
+```bash
+mkdir -p params pdbs runs
+```
+
+### Run with docker run
+
+```bash
+docker run --rm -it --gpus all \
+  --shm-size=16g --ipc=host \
+  -v "$PWD/pdbs:/workspace/pdbs" \
+  -v "$PWD/runs:/workspace/runs" \
+  -w /workspace germinal:latest bash
+```
+
+Inside the container you can run Germinal commands, for example:
+
+```bash
+python run_germinal.py
+```
+
+### Run with docker compose
+
+```bash
+# Start an interactive shell
+docker compose run --rm germinal bash
+
+# Or run directly (no shell)
+docker compose run --rm germinal python run_germinal.py
+```
+
+### PyRosetta
+
+PyRosetta is installed in the image via conda using the Rosetta Commons channel. No extra steps are required.
+
+### AlphaFold(-Multimer) parameters
+
+AlphaFold-Multimer parameters are downloaded into `/workspace/params` at image build time. AlphaFold3 parameters (optional) follow the upstream instructions at `https://github.com/google-deepmind/alphafold3` and should also be placed under `/workspace/params` if used.
+
+### Example runs
+
+```bash
+# Default VHH + PD-L1 + default filters
+docker compose run --rm germinal python run_germinal.py
+
+# scFv
+docker compose run --rm germinal python run_germinal.py run=scfv
+
+# Custom target and overrides
+docker compose run --rm germinal python run_germinal.py \
+  target=pdl1 \
+  experiment_name=my_experiment \
+  max_trajectories=100
 ```
 
 <!-- TOC --><a name="output-format"></a>
