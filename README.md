@@ -260,7 +260,7 @@ Run Germinal without a local install using the provided Dockerfile and docker-co
 Verify GPU access for containers:
 
 ```bash
-docker run --rm --gpus all nvidia/cuda:12.4.1-cudnn9-runtime-ubuntu22.04 nvidia-smi
+docker run --rm --gpus all nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04 nvidia-smi
 ```
 
 ### Build the image
