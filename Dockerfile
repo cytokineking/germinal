@@ -72,9 +72,12 @@ RUN set -euxo pipefail; \
   python -m pip install "torch_geometric==2.6.*" -f "${PYG_URL}"; \
   python -m pip install \
     chex dm-haiku==0.0.13 dm-tree joblib ml-collections immutabledict optax \
-    pandas matplotlib numpy biopython scipy seaborn tqdm py3dmol colabfold \
+    pandas matplotlib numpy biopython scipy seaborn tqdm py3dmol \
     iglm chai-lab==0.6.1 torchtyping==0.1.5; \
   true
+
+# Install colabfold ignoring dependency constraints (intentional)
+RUN python -m pip install --no-deps colabfold==1.5.5
 
 # Install ColabDesign (editable)
 COPY colabdesign /workspace/colabdesign
