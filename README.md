@@ -248,61 +248,19 @@ interface_shape_comp: {'value': 0.6, 'operator': '>'}
 <!-- TOC --><a name="container"></a>
 ## Container (Docker/Compose)
 
-Run Germinal without a local install using the provided Dockerfile and docker-compose.yml. This is the recommended way to get a reproducible environment, including CUDA-enabled JAX and PyTorch. The container automatically installs PyRosetta and downloads AlphaFold-Multimer parameters.
-
-### Running Germinal in Docker (recommended pattern)
-
-Decide where your inputs and outputs live. Typical layout:
-
-- Host input PDB: `/abs/path/to/your_target.pdb`
-- Host output dir: `/abs/path/to/run_outputs`
-- Settings: use repo defaults inside the container or mount your own configs
-
-Examples:
-
-1) Use repository defaults for settings (inside container), mount only outputs
+See `container-use.md` for full Docker/Compose guidance, including GPU prerequisites, mounts, and run patterns. Quick start:
 
 ```bash
-mkdir -p /abs/path/to/run_outputs
-docker run --gpus all --rm -it \
+docker build -t germinal:latest .
+
+docker run --rm -it --gpus all \
+  --shm-size=16g --ipc=host \
   --ulimit nofile=65536:65536 \
-  -v /abs/path/to/run_outputs:/workspace/runs \
-  -v "$PWD/pdbs:/workspace/pdbs:ro" \
-  -w /workspace germinal:latest \
-  python run_germinal.py
+  -v "$PWD/pdbs:/workspace/pdbs" \
+  -v "$PWD/runs:/workspace/runs" \
+  -w /workspace germinal:latest python run_germinal.py \
+  project_dir=/workspace/runs results_dir=. experiment_name=germinal_run
 ```
-
-2) Mount a custom target YAML and input PDB from the host
-
-```bash
-mkdir -p /abs/path/to/run_outputs
-docker run --gpus all --rm -it \
-  --ulimit nofile=65536:65536 \
-  -v /abs/path/to/run_outputs:/workspace/runs \
-  -v /abs/path/to/my_target.yaml:/workspace/configs/target/my_target.yaml:ro \
-  -v /abs/path/to/your_target.pdb:/workspace/pdbs/your_target.pdb:ro \
-  -w /workspace germinal:latest \
-  python run_germinal.py target=my_target
-```
-
-3) Mount custom filter/run settings too
-
-```bash
-docker run --gpus all --rm -it \
-  --ulimit nofile=65536:65536 \
-  -v /abs/path/to/run_outputs:/workspace/runs \
-  -v /abs/path/to/my_target.yaml:/workspace/configs/target/my_target.yaml:ro \
-  -v /abs/path/to/my_initial.yaml:/workspace/configs/filter/initial/custom.yaml:ro \
-  -v /abs/path/to/my_final.yaml:/workspace/configs/filter/final/custom.yaml:ro \
-  -v /abs/path/to/your_target.pdb:/workspace/pdbs/your_target.pdb:ro \
-  -w /workspace germinal:latest \
-  python run_germinal.py target=my_target filter.initial=custom filter.final=custom
-```
-
-Notes:
-- Always mount your output directory to `/workspace/runs`.
-- Consider increasing file descriptor limits with `--ulimit nofile=65536:65536` for heavy workloads.
-- By default, the image includes AF-Multimer params in `/workspace/params` and PyRosetta via conda.
 
 ### Prerequisites
 
