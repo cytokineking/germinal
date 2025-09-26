@@ -215,7 +215,7 @@ def main(cfg: DictConfig):
                 io.save_trajectory(mpnn_trajectory)
                 if accepted:
                     print(f"========================================")
-                    print(f"Design {mpnn_trajectory.name} accepted!")
+                    print(f"Design {mpnn_trajectory.design_name} accepted!")
                     print(f"========================================")
                     num_accepted += 1
                 else:
