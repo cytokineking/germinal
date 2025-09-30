@@ -331,29 +331,54 @@ def create_starting_structure(
     Returns:
         str: Amino acid sequence of the binder chain in single-letter code
     """
-    target_chain = target_chain.split(",")
+    # Accept either a comma-separated string or a list/tuple of chain IDs
+    if isinstance(target_chain, (list, tuple)):
+        target_chain_list = [str(c).strip() for c in target_chain if str(c).strip()]
+    else:
+        target_chain_list = [c.strip() for c in str(target_chain).split(",") if c.strip()]
 
     # Set up the parser and structure objects
     parser = PDB.PDBParser(QUIET=True)
     # Load the two structures
     structure1 = parser.get_structure("structure1", target_pdb)
     structure2 = parser.get_structure("structure2", binder_pdb)
+
     # Create a new structure to hold the combined molecules
     combined = PDB.Structure.Structure("combined")
     # Create a model in the new structure
     model = PDB.Model.Model(0)
     combined.add(model)
-    # Add chain A from first structure
-    chainA = structure1[0][target_chain[0]]
-    model.add(chainA)
-    # Add chain from second structure as chain B
+
+    # Build/append target as a single chain 'A'.
+    # If multiple target chains are specified, concatenate them into chain 'A'
+    # with residue numbering gaps of 50 between consecutive source chains.
+    new_chainA = PDB.Chain.Chain("A")
+
+    # Counter for new residue numbering (PDB numbering)
+    current_res_index = 0
+    GAP_SIZE = 50
+
+    for idx, ch_id in enumerate(target_chain_list):
+        source_chain = structure1[0][ch_id]
+        # Insert a numbering gap between concatenated chains (except before first)
+        if idx > 0:
+            current_res_index += GAP_SIZE
+        # Copy residues with updated sequential numbering
+        for i, old_res in enumerate(source_chain, start=1):
+            new_res = old_res.copy()
+            # Reset residue ID: (hetero_flag, new_resnum, insertion_code)
+            new_res.id = (" ", current_res_index + i, " ")
+            new_chainA.add(new_res)
+        current_res_index += len(list(source_chain))
+
+    # Add concatenated chain A to model
+    model.add(new_chainA)
+
+    # Add binder from second structure as chain 'binder_chain' (default 'B')
     chainB = structure2[0][start_binder_chain]
-    chainB.id = binder_chain  # Rename the chain to B
+    chainB.id = binder_chain
     model.add(chainB)
-    for chain_id in target_chain[1:]:
-        chain = structure1[0][chain_id]
-        chain.id = chain_id
-        model.add(chain)
+
     # Save the combined structure
     io = PDB.PDBIO()
     io.set_structure(combined)

@@ -165,6 +165,9 @@ def initialize_germinal_run(
         template_binder_pdb = os.path.join(
             run_settings.get("pdb_dir", "pdbs"), f"{binder_type}.pdb"
         )
+        # Build a combined starting complex. If multiple target chains are provided
+        # (e.g., "A,B,C"), they will be concatenated into a single chain 'A' with
+        # a 50-residue numbering gap between successive chains.
         create_starting_structure(
             starting_pdb_complex,
             template_binder_pdb,
@@ -172,6 +175,61 @@ def initialize_germinal_run(
             binder_chain=target_settings.get("binder_chain", "B"),
             target_chain=target_settings.get("target_chain", "A"),
         )
+
+        # Normalize target chain to 'A' post-concatenation and remap hotspots
+        chains_field = target_settings.get("target_chain", "A")
+        if "," in chains_field:
+            # Update target_chain to single 'A'
+            target_settings["target_chain"] = "A"
+
+            # Remap hotspots, if provided, from original chains to concatenated 'A'
+            hotspots = target_settings.get("target_hotspots", "")
+            if hotspots:
+                # Compute original chain lengths from the original target PDB
+                chain_seqs = get_sequence_from_pdb(target_pdb_path)
+                chain_order = [c.strip() for c in chains_field.split(",") if c.strip()]
+                gap = 50
+                # Precompute offsets for each chain in order
+                offsets = {}
+                running = 0
+                for idx, ch in enumerate(chain_order):
+                    if idx > 0:
+                        running += gap
+                    offsets[ch] = running
+                    running += len(chain_seqs.get(ch, ""))
+
+                def _remap_token(tok: str) -> str:
+                    tok = tok.strip()
+                    if not tok:
+                        return ""
+                    # Determine chain label and residue spec
+                    if tok[0].isalpha():
+                        ch = tok[0]
+                        rest = tok[1:]
+                    else:
+                        # default to first chain when none specified
+                        ch = chain_order[0]
+                        rest = tok
+                    off = offsets.get(ch, 0)
+                    if "-" in rest:
+                        s, e = rest.split("-")
+                        try:
+                            s_i = int(s)
+                            e_i = int(e)
+                        except Exception:
+                            return tok  # leave unchanged on parse error
+                        return f"A{off + s_i}-A{off + e_i}"
+                    else:
+                        try:
+                            r = int(rest)
+                        except Exception:
+                            return tok
+                        return f"A{off + r}"
+
+                remapped = ",".join(
+                    [t for t in (_remap_token(x) for x in hotspots.split(",")) if t]
+                )
+                target_settings["target_hotspots"] = remapped
 
     run_settings["starting_binder_seq"] = get_sequence_from_pdb(starting_pdb_complex)[
         target_settings.get("binder_chain", "B")
