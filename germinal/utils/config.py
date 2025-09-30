@@ -178,7 +178,15 @@ def initialize_germinal_run(
 
         # Normalize target chain to 'A' post-concatenation and remap hotspots
         chains_field = target_settings.get("target_chain", "A")
-        if "," in chains_field:
+        # Build ordered list of chains from provided field (supports list or comma-separated string)
+        if isinstance(chains_field, (list, tuple)):
+            chain_order = [str(c).strip() for c in chains_field if str(c).strip()]
+            multi_chain = len(chain_order) > 1
+        else:
+            chain_order = [c.strip() for c in str(chains_field).split(",") if c.strip()]
+            multi_chain = "," in str(chains_field)
+
+        if multi_chain:
             # Update target_chain to single 'A'
             target_settings["target_chain"] = "A"
 
@@ -187,7 +195,6 @@ def initialize_germinal_run(
             if hotspots:
                 # Compute original chain lengths from the original target PDB
                 chain_seqs = get_sequence_from_pdb(target_pdb_path)
-                chain_order = [c.strip() for c in chains_field.split(",") if c.strip()]
                 gap = 50
                 # Precompute offsets for each chain in order
                 offsets = {}
@@ -227,7 +234,7 @@ def initialize_germinal_run(
                         return f"A{off + r}"
 
                 remapped = ",".join(
-                    [t for t in (_remap_token(x) for x in hotspots.split(",")) if t]
+                    [t for t in (_remap_token(x) for x in str(hotspots).split(",")) if t]
                 )
                 target_settings["target_hotspots"] = remapped
 
