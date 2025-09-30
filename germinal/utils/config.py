@@ -156,87 +156,78 @@ def initialize_germinal_run(
     starting_pdb_complex = os.path.join(
         run_settings.get("pdb_dir", "pdbs"), f"{complex_name}.pdb"
     )
-    # Generate starting complex if not present, otherwise use existing structure
-    if not os.path.exists(starting_pdb_complex):
-        target_pdb_path = target_settings.get("target_pdb_path")
-        assert os.path.exists(target_pdb_path), (
-            f"Target PDB path does not exist: {target_pdb_path}"
-        )
+    # Prepare multi-chain handling
+    target_pdb_path = target_settings.get("target_pdb_path")
+    assert os.path.exists(target_pdb_path), (
+        f"Target PDB path does not exist: {target_pdb_path}"
+    )
+    chains_field = target_settings.get("target_chain", "A")
+    if isinstance(chains_field, (list, tuple)):
+        chain_order = [str(c).strip() for c in chains_field if str(c).strip()]
+    else:
+        chain_order = [c.strip() for c in str(chains_field).split(",") if c.strip()]
+    multi_chain = len(chain_order) > 1
+
+    # Generate or (for multi-chain) rebuild starting complex to ensure concatenation
+    if not os.path.exists(starting_pdb_complex) or multi_chain:
         template_binder_pdb = os.path.join(
             run_settings.get("pdb_dir", "pdbs"), f"{binder_type}.pdb"
         )
-        # Build a combined starting complex. If multiple target chains are provided
-        # (e.g., "A,B,C"), they will be concatenated into a single chain 'A' with
-        # a 50-residue numbering gap between successive chains.
         create_starting_structure(
             starting_pdb_complex,
             template_binder_pdb,
             target_pdb_path,
             binder_chain=target_settings.get("binder_chain", "B"),
-            target_chain=target_settings.get("target_chain", "A"),
+            target_chain=chain_order if multi_chain else target_settings.get("target_chain", "A"),
         )
 
-        # Normalize target chain to 'A' post-concatenation and remap hotspots
-        chains_field = target_settings.get("target_chain", "A")
-        # Build ordered list of chains from provided field (supports list or comma-separated string)
-        if isinstance(chains_field, (list, tuple)):
-            chain_order = [str(c).strip() for c in chains_field if str(c).strip()]
-            multi_chain = len(chain_order) > 1
-        else:
-            chain_order = [c.strip() for c in str(chains_field).split(",") if c.strip()]
-            multi_chain = "," in str(chains_field)
+    # Normalize target chain to 'A' post-concatenation and remap hotspots (always do for multi-chain)
+    if multi_chain:
+        target_settings["target_chain"] = "A"
+        hotspots = target_settings.get("target_hotspots", "")
+        if hotspots:
+            # Compute original chain lengths from the original target PDB
+            chain_seqs = get_sequence_from_pdb(target_pdb_path)
+            gap = 50
+            offsets = {}
+            running = 0
+            for idx, ch in enumerate(chain_order):
+                if idx > 0:
+                    running += gap
+                offsets[ch] = running
+                running += len(chain_seqs.get(ch, ""))
 
-        if multi_chain:
-            # Update target_chain to single 'A'
-            target_settings["target_chain"] = "A"
+            def _remap_token(tok: str) -> str:
+                tok = tok.strip()
+                if not tok:
+                    return ""
+                # Determine chain label and residue spec
+                if tok[0].isalpha():
+                    ch = tok[0]
+                    rest = tok[1:]
+                else:
+                    ch = chain_order[0]
+                    rest = tok
+                off = offsets.get(ch, 0)
+                if "-" in rest:
+                    s, e = rest.split("-")
+                    try:
+                        s_i = int(s)
+                        e_i = int(e)
+                    except Exception:
+                        return tok
+                    return f"A{off + s_i}-A{off + e_i}"
+                else:
+                    try:
+                        r = int(rest)
+                    except Exception:
+                        return tok
+                    return f"A{off + r}"
 
-            # Remap hotspots, if provided, from original chains to concatenated 'A'
-            hotspots = target_settings.get("target_hotspots", "")
-            if hotspots:
-                # Compute original chain lengths from the original target PDB
-                chain_seqs = get_sequence_from_pdb(target_pdb_path)
-                gap = 50
-                # Precompute offsets for each chain in order
-                offsets = {}
-                running = 0
-                for idx, ch in enumerate(chain_order):
-                    if idx > 0:
-                        running += gap
-                    offsets[ch] = running
-                    running += len(chain_seqs.get(ch, ""))
-
-                def _remap_token(tok: str) -> str:
-                    tok = tok.strip()
-                    if not tok:
-                        return ""
-                    # Determine chain label and residue spec
-                    if tok[0].isalpha():
-                        ch = tok[0]
-                        rest = tok[1:]
-                    else:
-                        # default to first chain when none specified
-                        ch = chain_order[0]
-                        rest = tok
-                    off = offsets.get(ch, 0)
-                    if "-" in rest:
-                        s, e = rest.split("-")
-                        try:
-                            s_i = int(s)
-                            e_i = int(e)
-                        except Exception:
-                            return tok  # leave unchanged on parse error
-                        return f"A{off + s_i}-A{off + e_i}"
-                    else:
-                        try:
-                            r = int(rest)
-                        except Exception:
-                            return tok
-                        return f"A{off + r}"
-
-                remapped = ",".join(
-                    [t for t in (_remap_token(x) for x in str(hotspots).split(",")) if t]
-                )
-                target_settings["target_hotspots"] = remapped
+            remapped = ",".join(
+                [t for t in (_remap_token(x) for x in str(hotspots).split(",")) if t]
+            )
+            target_settings["target_hotspots"] = remapped
 
     run_settings["starting_binder_seq"] = get_sequence_from_pdb(starting_pdb_complex)[
         target_settings.get("binder_chain", "B")
