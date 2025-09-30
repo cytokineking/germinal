@@ -36,6 +36,7 @@ from germinal.utils.utils import (
     get_sequence_from_pdb,
 )
 from germinal.utils.io import RunLayout, IO
+from Bio import PDB
 
 
 def process_config(cfg: DictConfig) -> Dict[str, Any]:
@@ -186,16 +187,19 @@ def initialize_germinal_run(
         target_settings["target_chain"] = "A"
         hotspots = target_settings.get("target_hotspots", "")
         if hotspots:
-            # Compute original chain lengths from the original target PDB
-            chain_seqs = get_sequence_from_pdb(target_pdb_path)
-            gap = 50
+            # Compute original chain residue counts from the original target PDB
+            # No gaps are inserted in the actual PDB, so offsets are sequential
+            parser = PDB.PDBParser(QUIET=True)
+            structure = parser.get_structure("target", target_pdb_path)
             offsets = {}
             running = 0
             for idx, ch in enumerate(chain_order):
-                if idx > 0:
-                    running += gap
                 offsets[ch] = running
-                running += len(chain_seqs.get(ch, ""))
+                try:
+                    res_count = len(list(structure[0][ch]))
+                except Exception:
+                    res_count = len(get_sequence_from_pdb(target_pdb_path).get(ch, ""))
+                running += res_count
 
             def _remap_token(tok: str) -> str:
                 tok = tok.strip()

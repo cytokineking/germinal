@@ -17,3 +17,5 @@ __pycache__/
 params/*params_*
 
 .cursorignore
+
+/BindCraft-main-v1.5/
