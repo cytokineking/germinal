@@ -63,6 +63,9 @@ def germinal_design(
     # Extract configuration parameters from input dictionaries
     starting_pdb = run_settings["starting_pdb_complex"]
     chain = target_settings["target_chain"]
+    # Normalize multi-chain to comma-separated string for ColabDesign
+    if isinstance(chain, (list, tuple)):
+        chain = ",".join(map(str, chain))
     target_hotspot_residues = target_settings.get("target_hotspots", "")
     length = target_settings["length"]
     design_models = run_settings.get("design_models", [0,1,2,3,4])
@@ -73,6 +76,8 @@ def germinal_design(
     clear_best = run_settings.get("clear_best", True)
     bias_redesign = run_settings.get("bias_redesign", 10)
     binder_chain = target_settings.get("binder_chain", "B")
+    if isinstance(binder_chain, (list, tuple)):
+        binder_chain = ",".join(map(str, binder_chain))
     rm_binder_seq = run_settings.get("rm_binder_seq", True)
     rm_binder_sc = run_settings.get("rm_binder_sc", True)
     rm_binder = run_settings.get("rm_binder", False)
