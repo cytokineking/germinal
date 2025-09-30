@@ -331,7 +331,11 @@ def create_starting_structure(
     Returns:
         str: Amino acid sequence of the binder chain in single-letter code
     """
-    target_chain = target_chain.split(",")
+    # Accept either a comma-separated string or a list/tuple of chain IDs
+    if isinstance(target_chain, (list, tuple)):
+        target_chain = [str(c).strip() for c in target_chain if str(c).strip()]
+    else:
+        target_chain = [c.strip() for c in str(target_chain).split(",") if c.strip()]
 
     # Set up the parser and structure objects
     parser = PDB.PDBParser(QUIET=True)
